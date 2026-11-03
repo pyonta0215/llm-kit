@@ -1,31 +1,41 @@
-# research-kit
+# llm-kit
 
-LLM で調べものをする機能で繰り返し書いていた処理をまとめた、小さなヘルパー集です。依存パッケージはありません（Node 20 以上と Cloudflare Workers の `fetch` / `AbortSignal` だけを使います）。
+LLM の API を呼ぶ機能で繰り返し書いていた処理と、モデル名・単価の目録をまとめた、小さなヘルパー集です。2026-11-03 に research-kit から改名しました（[ADR 0001](docs/adr/0001-rename-and-model-catalog.md)）。古い URL（`github:pyonta0215/research-kit#v0.2.0` など）は GitHub の転送でそのまま動きます。依存パッケージはありません（Node 20 以上と Cloudflare Workers の `fetch` / `AbortSignal` だけを使います）。
 
 | サブパス | 中身 |
 |---|---|
-| `@pyonta0215/research-kit/responses` | Responses API の結果から本文・使用量・出典（引用 / 検索結果 / 開いたページ）を取り出す。タイムアウト付きの送信と、キーや本文を含まないエラー |
-| `@pyonta0215/research-kit/json` | コードフェンスや前置きに包まれた出力から JSON を取り出す |
-| `@pyonta0215/research-kit/cost` | 使用量 × 単価の費用計算。単価が分からないモデルを 0 円にしない。実測 / 推定 / 未計測の区別 |
-| `@pyonta0215/research-kit/budget` | 1回の実行の中の予約・精算の台帳 |
+| `@pyonta0215/llm-kit/responses` | Responses API の結果から本文・使用量・出典（引用 / 検索結果 / 開いたページ）を取り出す。タイムアウト付きの送信と、キーや本文を含まないエラー |
+| `@pyonta0215/llm-kit/json` | コードフェンスや前置きに包まれた出力から JSON を取り出す |
+| `@pyonta0215/llm-kit/cost` | 使用量 × 単価の費用計算。単価が分からないモデルを 0 円にしない。実測 / 推定 / 未計測の区別 |
+| `@pyonta0215/llm-kit/budget` | 1回の実行の中の予約・精算の台帳 |
+| `@pyonta0215/llm-kit/catalog` | モデル名と単価の目録（Standard tier）。各行に確かめた日と出典を持つ。Web 検索の1回あたりの単価 |
 
 npm には公開していません。git タグで参照します。
 
 ```bash
-npm install github:pyonta0215/research-kit#v0.1.0
+npm install github:pyonta0215/llm-kit#v0.3.0
 ```
+
+## research-kit からの移り方
+
+| 0.2.0 まで | 0.3.0 から |
+|---|---|
+| `"@pyonta0215/research-kit": "github:pyonta0215/research-kit#v0.2.0"` | `"@pyonta0215/llm-kit": "github:pyonta0215/llm-kit#v0.3.0"` |
+| `import … from '@pyonta0215/research-kit/cost'` | `import … from '@pyonta0215/llm-kit/cost'`（`responses`・`json`・`budget` も同じ） |
+| 利用側の単価表 | `import { MODEL_CATALOG } from '@pyonta0215/llm-kit/catalog'` と `requirePrice(MODEL_CATALOG, model)` |
+
+中身（`responses`・`json`・`cost`・`budget`）は 0.2.0 と同じです。
 
 ## ここに入れないもの
 
 - プロンプト、ツールの設定（`tools` / `include` / `text.format`）、業務スキーマ、出典の採否、URL の正規化ルール
-- 単価表そのもの（転記日と出典を利用側で管理する）
 - 月額などの、実行をまたいだ予算の管理（後述）
 - 汎用の LLM SDK。送信は `fetch` 1回分だけで、再試行やストリーミングは持たない。公式 SDK で足りる場面では SDK を使い、そのレスポンスを `parseResponse` に渡せる
 
 ## responses
 
 ```ts
-import { OPENAI_RESPONSES_URL, parseResponse, postResponsesRequest, sourceUrlsOf } from '@pyonta0215/research-kit/responses';
+import { OPENAI_RESPONSES_URL, parseResponse, postResponsesRequest, sourceUrlsOf } from '@pyonta0215/llm-kit/responses';
 
 const raw = await postResponsesRequest({
   url: OPENAI_RESPONSES_URL,
@@ -64,7 +74,7 @@ const { text, usage, sources, webSearch } = parseResponse(raw);
 ## json
 
 ```ts
-import { parseJsonFromText } from '@pyonta0215/research-kit/json';
+import { parseJsonFromText } from '@pyonta0215/llm-kit/json';
 
 const parsed = parseJsonFromText(text);
 if (parsed.ok) schema.safeParse(parsed.value);
@@ -75,7 +85,7 @@ if (parsed.ok) schema.safeParse(parsed.value);
 ## cost
 
 ```ts
-import { requirePrice, tokenCostUsd, webSearchCostUsd } from '@pyonta0215/research-kit/cost';
+import { requirePrice, tokenCostUsd, webSearchCostUsd } from '@pyonta0215/llm-kit/cost';
 
 const price = requirePrice(MODEL_PRICES, model); // 表に無ければ UnknownPriceError
 const usd =
@@ -113,7 +123,7 @@ const GPT_6_SOL = {
 ## budget
 
 ```ts
-import { BudgetExceededError, CostLedger } from '@pyonta0215/research-kit/budget';
+import { BudgetExceededError, CostLedger } from '@pyonta0215/llm-kit/budget';
 
 const ledger = new CostLedger(['llm', 'browser'], { limitUsd: 0.5 });
 
