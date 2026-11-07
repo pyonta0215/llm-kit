@@ -61,6 +61,20 @@ describe('CostLedger', () => {
     expect(() => ledger.release(reservation)).toThrow('already settled');
   });
 
+  it('精算・戻しは台帳に記録した予約額で行い、額を書き換えた予約は受け付けない（#8）', () => {
+    const ledger = new CostLedger(COMPONENTS, { limitUsd: 1 });
+    const reservation = ledger.reserve(0.6);
+    // readonly は実行時の書き換えを防がない。少ない額にして未計測で精算すると、保留額が減って上限が緩む
+    const tampered = { ...reservation, estimatedUsd: 0.01 };
+    expect(() => ledger.settle(tampered, 'llm', { usd: null, basis: 'unmeasured' })).toThrow('does not match');
+    expect(() => ledger.release(tampered)).toThrow('does not match');
+    expect(ledger.snapshot().outstandingUsd).toBe(0.6);
+
+    ledger.settle(reservation, 'llm', { usd: null, basis: 'unmeasured' });
+    expect(ledger.snapshot()).toMatchObject({ outstandingUsd: 0, heldForUnmeasuredUsd: 0.6 });
+    expect(() => ledger.reserve(0.5)).toThrow(BudgetExceededError);
+  });
+
   it('予約なしの記録: 実測・推定・未計測を分けて数え、上限に達したかを判定できる', () => {
     const ledger = new CostLedger(COMPONENTS, { limitUsd: 0.3 });
     ledger.record('llm', { usd: 0.2, basis: 'metered' });

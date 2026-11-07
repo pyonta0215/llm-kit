@@ -110,6 +110,8 @@ export interface TokenCostBreakdown {
  * `longContext` の判定は `usage` を1リクエスト分とみなして行う。
  */
 export function tokenCostBreakdown(price: TokenPrice, usage: TokenUsage): TokenCostBreakdown {
+  // 負の単価や NaN を通すと、不正な金額が合計や予算の判定に混ざる
+  assertValidPrice(price);
   assertCount(usage.inputTokens, 'inputTokens');
   assertCount(usage.outputTokens, 'outputTokens');
   const cached = Math.min(usage.cachedInputTokens ?? 0, usage.inputTokens);
@@ -158,6 +160,7 @@ export function webSearchCostUsd(counts: WebSearchCounts, pricing: WebSearchPric
   const units = pricing.count === 'all-calls' ? counts.calls : counts.search;
   if (units === undefined) throw new Error('Counting search actions requires the search count');
   assertCount(units, 'web search count');
+  if (!Number.isFinite(pricing.perCallUsd) || pricing.perCallUsd < 0) throw new Error('Invalid web search price');
   return units * pricing.perCallUsd;
 }
 

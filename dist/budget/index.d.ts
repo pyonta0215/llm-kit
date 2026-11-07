@@ -72,7 +72,7 @@ export declare class CostLedger<C extends string> {
     /**
      * 予約を実際の費用で精算する。
      * `unmeasured`（失敗して費用が分からない等）で精算すると、予約額を上限の判定に残したまま件数を数える。
-     * 分からない費用を 0 として予算を戻さないため。
+     * 分からない費用を 0 として予算を戻さないため。残す額は台帳に記録した予約額で、渡された予約の値は使わない。
      */
     settle(reservation: BudgetReservation, component: C, cost: MeasuredCost): void;
     /** 予約した処理を始めなかったとき（費用が発生していないと分かっているときだけ）予約を戻す。 */
@@ -85,5 +85,10 @@ export declare class CostLedger<C extends string> {
     snapshot(): LedgerSnapshot<C>;
     private add;
     private requireComponent;
+    /**
+     * 未精算の予約を台帳から外し、記録した予約額を返す。
+     * `readonly` は実行時に値の書き換えを防がないので、渡された予約の額が台帳と違えば受け付けない
+     */
+    private takeOutstanding;
     private outstandingUsd;
 }
