@@ -85,6 +85,13 @@ describe('tokenCostUsd', () => {
     expect(() => assertValidPrice(gpt6)).not.toThrow();
   });
 
+  it('負の数や NaN の単価は、計算する前に受け付けない（#8）', () => {
+    const usage = { inputTokens: 1000, outputTokens: 1000 };
+    expect(() => tokenCostUsd({ ...price, inputPerMillionUsd: -2 }, usage)).toThrow('Invalid token price');
+    expect(() => tokenCostUsd({ ...price, outputPerMillionUsd: Number.NaN }, usage)).toThrow('Invalid token price');
+    expect(() => tokenCostBreakdown({ ...price, cachedInputPerMillionUsd: Number.POSITIVE_INFINITY }, usage)).toThrow('Invalid token price');
+  });
+
   it('負の数や NaN の使用量は受け付けない', () => {
     expect(() => tokenCostUsd(price, { inputTokens: -1, outputTokens: 0 })).toThrow();
     expect(() => tokenCostUsd(price, { inputTokens: Number.NaN, outputTokens: 0 })).toThrow();
@@ -120,6 +127,11 @@ describe('webSearchCostUsd', () => {
   it('検索だけを数えるのに検索の件数が無ければ、0 にせず例外にする', () => {
     expect(webSearchCostUsd({ calls: 3 }, { perCallUsd: 0.01, count: 'all-calls' })).toBeCloseTo(0.03);
     expect(() => webSearchCostUsd({ calls: 3 }, { perCallUsd: 0.01, count: 'search-actions' })).toThrow();
+  });
+
+  it('負の数や NaN の単価は受け付けない（#8）', () => {
+    expect(() => webSearchCostUsd(counts, { perCallUsd: -0.01, count: 'all-calls' })).toThrow('Invalid web search price');
+    expect(() => webSearchCostUsd(counts, { perCallUsd: Number.NaN, count: 'all-calls' })).toThrow('Invalid web search price');
   });
 });
 

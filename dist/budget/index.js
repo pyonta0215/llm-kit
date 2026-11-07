@@ -50,16 +50,15 @@ export class CostLedger {
     /**
      * 予約を実際の費用で精算する。
      * `unmeasured`（失敗して費用が分からない等）で精算すると、予約額を上限の判定に残したまま件数を数える。
-     * 分からない費用を 0 として予算を戻さないため。
+     * 分からない費用を 0 として予算を戻さないため。残す額は台帳に記録した予約額で、渡された予約の値は使わない。
      */
     settle(reservation, component, cost) {
         const total = this.requireComponent(component);
         if (cost.basis !== 'unmeasured')
             assertNonNegative(cost.usd);
-        if (!this.outstanding.delete(reservation.id))
-            throw new Error('Budget reservation is missing or already settled');
+        const reservedUsd = this.takeOutstanding(reservation);
         if (cost.basis === 'unmeasured') {
-            this.heldUsd += reservation.estimatedUsd;
+            this.heldUsd += reservedUsd;
             total.unmeasured += 1;
             return;
         }
@@ -67,8 +66,7 @@ export class CostLedger {
     }
     /** 予約した処理を始めなかったとき（費用が発生していないと分かっているときだけ）予約を戻す。 */
     release(reservation) {
-        if (!this.outstanding.delete(reservation.id))
-            throw new Error('Budget reservation is missing or already settled');
+        this.takeOutstanding(reservation);
     }
     /**
      * 予約なしで費用を記録する（実行後にしか費用が分からない処理）。
@@ -116,6 +114,19 @@ export class CostLedger {
         if (!total)
             throw new Error(`Unknown cost component: ${component}`);
         return total;
+    }
+    /**
+     * 未精算の予約を台帳から外し、記録した予約額を返す。
+     * `readonly` は実行時に値の書き換えを防がないので、渡された予約の額が台帳と違えば受け付けない
+     */
+    takeOutstanding(reservation) {
+        const reservedUsd = this.outstanding.get(reservation.id);
+        if (reservedUsd === undefined)
+            throw new Error('Budget reservation is missing or already settled');
+        if (!Object.is(reservedUsd, reservation.estimatedUsd))
+            throw new Error('Budget reservation does not match the ledger');
+        this.outstanding.delete(reservation.id);
+        return reservedUsd;
     }
     outstandingUsd() {
         let sum = 0;
